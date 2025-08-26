@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ComChat - 简易聊天系统</title>
+    <!-- 引入外部资源 -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-storage.js"></script>
+    
+    <!-- 引入本地资源 -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 模态框容器 -->
+    <div id="modal-container" class="modal-backdrop">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 id="modal-title" class="modal-title"></h3>
+                <button id="close-modal" class="modal-close">×</button>
+            </div>
+            <div id="modal-body" class="modal-body"></div>
+            <div id="modal-footer" class="modal-footer">
+                <button id="modal-cancel" class="btn btn-secondary">取消</button>
+                <button id="modal-confirm" class="btn btn-primary">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知容器 -->
+    <div id="notification-container" class="notifications-container"></div>
+
+    <!-- 登录/注册界面 -->
+    <div id="auth-container">
+        <div class="auth-card animate-fade-in">
+            <div class="auth-header">
+                <h1><i class="fa fa-comments"></i> ComChat</h1>
+                <p>简单、快速的聊天体验</p>
+            </div>
+            
+            <!-- 切换标签 -->
+            <div class="auth-tabs">
+                <button id="login-tab" class="auth-tab active">登录</button>
+                <button id="register-tab" class="auth-tab">注册</button>
+            </div>
+            
+            <!-- 登录表单 -->
+            <div id="login-form" class="auth-form">
+                <div class="form-group">
+                    <label for="login-email">邮箱</label>
+                    <input type="email" id="login-email" class="form-control" placeholder="your@email.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="login-password">密码</label>
+                    <input type="password" id="login-password" class="form-control" placeholder="至少6个字符">
+                </div>
+                
+                <div class="remember-me">
+                    <input id="remember-me" type="checkbox">
+                    <label for="remember-me">记住我</label>
+                </div>
+                
+                <button id="login-btn" class="btn btn-primary w-full mb-4">登录</button>
+                
+                <div class="text-center">
+                    <a href="#" class="text-link text-sm">忘记密码?</a>
+                </div>
+                
+                <div class="separator">
+                    <span>或</span>
+                </div>
+                
+                <button id="anonymous-login-btn" class="btn btn-secondary w-full">
+                    <i class="fa fa-user-secret mr-2"></i>匿名登录
+                </button>
+            </div>
+            
+            <!-- 注册表单 -->
+            <div id="register-form" class="auth-form hidden">
+                <div class="form-group">
+                    <label for="register-username">用户名</label>
+                    <input type="text" id="register-username" class="form-control" placeholder="设置您的用户名">
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-email">邮箱</label>
+                    <input type="email" id="register-email" class="form-control" placeholder="your@email.com">
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-password">密码</label>
+                    <input type="password" id="register-password" class="form-control" placeholder="至少6个字符">
+                </div>
+                
+                <div class="form-group">
+                    <label for="register-confirm-password">确认密码</label>
+                    <input type="password" id="register-confirm-password" class="form-control" placeholder="再次输入密码">
+                </div>
+                
+                <button id="register-btn" class="btn btn-primary w-full">注册</button>
+            </div>
+        </div>
+        
+        <div class="mt-4 text-center text-sm text-gray-600">
+            部署到 GitHub 即可使用 | <a href="#" class="text-link">使用帮助</a>
+        </div>
+    </div>
+
+    <!-- 聊天主界面 -->
+    <div id="chat-container" class="hidden">
+        <!-- 顶部导航栏 -->
+        <header class="chat-header">
+            <div class="logo">
+                <button id="toggle-sidebar" class="mobile-menu-btn">
+                    <i class="fa fa-bars"></i>
+                </button>
+                <i class="fa fa-comments"></i>
+                <span>ComChat</span>
+            </div>
+            
+            <div class="user-menu">
+                <button id="public-chat-btn" class="btn btn-secondary">
+                    <i class="fa fa-users mr-1"></i> 公共聊天
+                </button>
+                <button id="find-friends-btn">
+                    <i class="fa fa-user-plus"></i>
+                </button>
+                <div class="user-info">
+                    <div id="current-user-avatar" class="avatar">U</div>
+                    <span id="current-user-name">用户名</span>
+                </div>
+                <button id="logout-btn">
+                    <i class="fa fa-sign-out"></i>
+                </button>
+            </div>
+        </header>
+        
+        <!-- 主要内容区 -->
+        <div class="main-content">
+            <!-- 侧边栏 -->
+            <aside id="sidebar" class="sidebar">
+                <!-- 搜索框 -->
+                <div class="search-bar">
+                    <input type="text" id="search-input" class="search-input" placeholder="搜索聊天或好友...">
+                </div>
+                
+                <!-- 侧边栏标签 -->
+                <div class="sidebar-tabs">
+                    <button id="chats-tab" class="sidebar-tab active">聊天</button>
+                    <button id="friends-tab" class="sidebar-tab">好友</button>
+                </div>
+                
+                <!-- 聊天列表 -->
+                <div id="chats-list" class="chat-list">
+                    <!-- 公共聊天室 -->
+                    <div class="chat-item active" data-chat-type="public" data-chat-id="public">
+                        <div class="avatar">
+                            <i class="fa fa-users"></i>
+                        </div>
+                        <div class="chat-info">
+                            <div class="chat-name">公共聊天室</div>
+                            <div class="chat-last-message">大家可以在这里畅所欲言</div>
+                        </div>
+                        <div class="chat-time">--:--</div>
+                    </div>
+                    
+                    <!-- 聊天列表将动态生成 -->
+                </div>
+                
+                <!-- 好友列表 -->
+                <div id="friends-list" class="friends-list hidden">
+                    <!-- 好友分组 -->
+                    <div class="search-bar">
+                        <h3>在线好友</h3>
+                    </div>
+                    
+                    <!-- 在线好友将动态生成 -->
+                    
+                    <div class="search-bar">
+                        <h3>离线好友</h3>
+                    </div>
+                    
+                    <!-- 离线好友将动态生成 -->
+                </div>
+            </aside>
+            
+            <!-- 聊天区域 -->
+            <main class="chat-area">
+                <!-- 聊天头部 -->
+                <div class="chat-area-header">
+                    <button id="back-to-list" class="back-btn">
+                        <i class="fa fa-arrow-left"></i>
+                    </button>
+                    
+                    <div id="chat-avatar" class="avatar">
+                        <i class="fa fa-users"></i>
+                    </div>
+                    
+                    <div>
+                        <div id="chat-title" class="chat-area-title">公共聊天室</div>
+                        <div id="chat-status" class="chat-area-status">大家可以在这里畅所欲言</div>
+                    </div>
+                </div>
+                
+                <!-- 消息区域 -->
+                <div id="messages-container" class="messages-container">
+                    <!-- 欢迎消息 -->
+                    <div class="text-center">
+                        <span style="background-color: #e4e6eb; color: #666; padding: 5px 10px; border-radius: 12px; font-size: 12px;">
+                            欢迎来到公共聊天室
+                        </span>
+                    </div>
+                    
+                    <!-- 消息将动态生成 -->
+                </div>
+                
+                <!-- 正在输入提示 -->
+                <div id="typing-indicator" class="typing-indicator hidden">
+                    <span id="typing-users"></span> 正在输入...
+                </div>
+                
+                <!-- 输入区域 -->
+                <div class="input-area">
+                    <div class="input-toolbar">
+                        <button id="attachment-btn" class="input-tool">
+                            <i class="fa fa-paperclip"></i>
+                        </button>
+                        <input type="file" id="attachment-input" class="hidden" multiple accept="image/*,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx">
+                        <button id="emoji-btn" class="input-tool">
+                            <i class="fa fa-smile-o"></i>
+                        </button>
+                        <div style="flex: 1;"></div>
+                        <button id="mic-btn" class="input-tool">
+                            <i class="fa fa-microphone"></i>
+                        </button>
+                    </div>
+                    
+                    <form id="message-form" class="message-form">
+                        <textarea id="message-input" class="message-input" placeholder="输入消息..."></textarea>
+                        <button type="submit" class="send-button">
+                            <i class="fa fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 引入JavaScript文件 -->
+    <script src="config.js"></script>
+    <script src="utils.js"></script>
+    <script src="auth.js"></script>
+    <script src="chat.js"></script>
+    <script src="friends.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
+    
